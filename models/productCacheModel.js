@@ -1,4 +1,4 @@
-// productCacheModel.js
+// orders microservice productCacheModel.js
 const mongoose = require("mongoose");
 
 const productCacheSchema = new mongoose.Schema({

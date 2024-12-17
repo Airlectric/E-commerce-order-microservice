@@ -4,6 +4,8 @@ const { connectRabbitMQ } = require("./config/rabbitmq");
 const orderRouter = require("./routes/orderRouter");
 const { connectOrderDB } = require("./config/db");
 const { consumeProductEvents } = require("./events/consumeProductEvents");
+const syncProductCache = require("./services/productCacheSyncService");
+const { initializeAndSync } = require('./elasticsearchSync');
 
 require("dotenv").config();
 
@@ -17,9 +19,18 @@ app.use(express.json());
 
     // Connect to the main Order DB
     connectOrderDB();
+	
+	// Start ProductCache Sync Service
+    await syncProductCache();
 
     await connectRabbitMQ();
-    await consumeProductEvents();
+    // await consumeProductEvents();
+	
+
+	initializeAndSync().catch((error) => {
+	  console.error('Failed to initialize and sync:', error);
+	});
+
 
     // Start the server
     const PORT = process.env.PORT || 3000;

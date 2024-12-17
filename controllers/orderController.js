@@ -21,7 +21,6 @@ const validateProductsAndCalculateTotal = async (products) => {
   let totalAmount = 0;
   const productDetails = [];
   const inventoryUpdates = [];
-  const remainingQuantities = [];
   let productCount = 0;
 
   for (const product of products) {
@@ -46,16 +45,11 @@ const validateProductsAndCalculateTotal = async (products) => {
       quantity: -product.quantity, // Deduction for inventory
     });
 
-    remainingQuantities.push({
-      productId: product.productId,
-      remainingQuantity: productRecord.quantity - product.quantity, // Remaining stock
-    });
-
     totalAmount += product.quantity * productRecord.price;
     productCount += product.quantity;
   }
 
-  return { totalAmount, productDetails, inventoryUpdates, remainingQuantities, productCount };
+  return { totalAmount, productDetails, inventoryUpdates, productCount };
 };
 
 // Create an order
@@ -67,7 +61,7 @@ exports.createOrder = async (req, res) => {
       return res.status(400).json({ message: "Products are required" });
     }
 
-    const { totalAmount, productDetails, inventoryUpdates, remainingQuantities, productCount } =
+    const { totalAmount, productDetails, inventoryUpdates, productCount } =
       await validateProductsAndCalculateTotal(products);
 
     const order = new Order({
@@ -78,23 +72,24 @@ exports.createOrder = async (req, res) => {
 
     await order.save();
 
-    // Notify RabbitMQ
-    sendMessage("order_events_for_notifications", {
-      type: "order_placed",
-      data: {
-        orderId: order.id,
-        userId: req.user.user_id,
-        totalProducts: productCount,
-        productIds: productDetails.map(({ productId }) => productId),
-        quantities: productDetails.map(({ quantity }) => quantity),
-        sellerIds: productDetails.map(({ sellerId }) => sellerId),
-        titles: productDetails.map(({ title }) => title),
-        remainingQuantities, // Include remaining stock
-      },
-    });
-
-    // Notify inventory updates
+    // Send inventory updates first
     sendMessage("update_inventory", inventoryUpdates);
+
+    // Set a 5-second delay for the order events notification
+    setTimeout(() => {
+      sendMessage("order_events_for_notifications", {
+        type: "order_placed",
+        data: {
+          orderId: order.id,
+          userId: req.user.user_id,
+          totalProducts: productCount,
+          productIds: productDetails.map(({ productId }) => productId),
+          quantities: productDetails.map(({ quantity }) => quantity),
+          sellerIds: productDetails.map(({ sellerId }) => sellerId),
+          titles: productDetails.map(({ title }) => title),
+        },
+      });
+    }, 5000);
 
     // Index the order in Elasticsearch
     await esClient.index({
@@ -116,7 +111,6 @@ exports.createOrder = async (req, res) => {
     res.status(500).json({ message: err.message });
   }
 };
-
 
 // Get all orders for a user
 exports.getOrders = async (req, res) => {
@@ -149,7 +143,6 @@ exports.getOrderById = async (req, res) => {
   }
 };
 
-
 // Update an order
 exports.updateOrder = async (req, res) => {
   try {
@@ -174,7 +167,7 @@ exports.updateOrder = async (req, res) => {
 
     const previousProducts = order.products;
 
-    const { totalAmount, productDetails, inventoryUpdates, remainingQuantities } =
+    const { totalAmount, productDetails, inventoryUpdates } =
       await validateProductsAndCalculateTotal(products);
 
     // Calculate inventory reversals for the previous state
@@ -188,23 +181,24 @@ exports.updateOrder = async (req, res) => {
 
     await order.save();
 
-    // Notify RabbitMQ
-    sendMessage("order_events_for_notifications", {
-      type: "order_updated",
-      data: {
-        orderId: order.id,
-        userId: req.user.user_id,
-        totalProducts: productDetails.length,
-        productIds: productDetails.map(({ productId }) => productId),
-        quantities: productDetails.map(({ quantity }) => quantity),
-        sellerIds: productDetails.map(({ sellerId }) => sellerId),
-        titles: productDetails.map(({ title }) => title),
-        remainingQuantities, // Include remaining stock
-      },
-    });
-
-    // Notify inventory updates (previous + current)
+    // Send inventory updates first
     sendMessage("update_inventory", [...reverseInventoryUpdates, ...inventoryUpdates]);
+
+    // Set a 5-second delay for the order events notification
+    setTimeout(() => {
+      sendMessage("order_events_for_notifications", {
+        type: "order_updated",
+        data: {
+          orderId: order.id,
+          userId: req.user.user_id,
+          totalProducts: productDetails.length,
+          productIds: productDetails.map(({ productId }) => productId),
+          quantities: productDetails.map(({ quantity }) => quantity),
+          sellerIds: productDetails.map(({ sellerId }) => sellerId),
+          titles: productDetails.map(({ title }) => title),
+        },
+      });
+    }, 5000);
 
     // Update Elasticsearch
     await esClient.update({
@@ -248,14 +242,12 @@ exports.deleteOrder = async (req, res) => {
               quantity: product.quantity,
               sellerId: productRecord.seller.id, // Fetch sellerId
               title: productRecord.title,        // Fetch title
-              remainingQuantity: productRecord.quantity + product.quantity, // Calculate remaining stock
             }
           : {
               productId: product.productId,
               quantity: product.quantity,
               sellerId: null,
               title: null,
-              remainingQuantity: null,
             };
       })
     );
@@ -268,23 +260,24 @@ exports.deleteOrder = async (req, res) => {
     // Delete the order using `deleteOne` or `findByIdAndDelete`
     await Order.deleteOne({ _id: req.params.id });
 
-    // Notify RabbitMQ
-    sendMessage("order_events_for_notifications", {
-      type: "order_deleted",
-      data: {
-        orderId: order.id,
-        userId: req.user.user_id,
-        totalProducts: productDetails.length,
-        productIds: productDetails.map(({ productId }) => productId),
-        quantities: productDetails.map(({ quantity }) => quantity),
-        sellerIds: productDetails.map(({ sellerId }) => sellerId),
-        titles: productDetails.map(({ title }) => title),
-        remainingQuantities: productDetails.map(({ remainingQuantity }) => remainingQuantity), // Include remaining stock
-      },
-    });
-
-    // Notify inventory reversal
+    // Send inventory updates first
     sendMessage("update_inventory", reverseInventoryUpdates);
+
+    // Set a 5-second delay for the order events notification
+    setTimeout(() => {
+      sendMessage("order_events_for_notifications", {
+        type: "order_deleted",
+        data: {
+          orderId: order.id,
+          userId: req.user.user_id,
+          totalProducts: productDetails.length,
+          productIds: productDetails.map(({ productId }) => productId),
+          quantities: productDetails.map(({ quantity }) => quantity),
+          sellerIds: productDetails.map(({ sellerId }) => sellerId),
+          titles: productDetails.map(({ title }) => title),
+        },
+      });
+    }, 5000);
 
     // Remove Elasticsearch entry
     await esClient.delete({
@@ -298,8 +291,6 @@ exports.deleteOrder = async (req, res) => {
     res.status(500).json({ message: err.message });
   }
 };
-
-
 
 // Update order status (Admin only)
 exports.updateOrderStatus = async (req, res) => {
@@ -334,4 +325,3 @@ exports.updateOrderStatus = async (req, res) => {
     res.status(500).json({ message: err.message });
   }
 };
-
