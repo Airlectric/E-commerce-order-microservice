@@ -1,6 +1,6 @@
 const validateRole = (roles) => (req, res, next) => {
     if (!roles.includes(req.user.role)) {
-      return res.status(403).json({ message: 'Access denied' });
+      return res.status(403).json({ message: 'Access denied by order service' });
     }
     next();
   };

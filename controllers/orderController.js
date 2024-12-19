@@ -37,7 +37,7 @@ const validateProductsAndCalculateTotal = async (products) => {
       productId: product.productId,
       quantity: product.quantity,
       title: productRecord.title,
-      sellerId: Number(productRecord.seller.id),
+      sellerId: productRecord.seller.id,
     });
 
     inventoryUpdates.push({
@@ -63,6 +63,8 @@ exports.createOrder = async (req, res) => {
 
     const { totalAmount, productDetails, inventoryUpdates, productCount } =
       await validateProductsAndCalculateTotal(products);
+	
+	
 
     const order = new Order({
       user: { id: req.user.user_id, profileUrl: req.user.profileUrl },
