@@ -8,6 +8,8 @@ const productCacheSchema = new mongoose.Schema({
   category_id: { type: String },
   price: { type: Number, required: true },
   quantity: { type: Number, required: true },
+  image: { type: String }, 
+  imageId: { type: mongoose.Schema.Types.ObjectId, ref: 'fs.files' },
   updatedAt: { type: Date, default: Date.now },
   category: { type: String },
   seller: {
@@ -16,4 +18,5 @@ const productCacheSchema = new mongoose.Schema({
 
 });
 
-module.exports = (connection) => connection.model("ProductCache", productCacheSchema);
+
+module.exports = mongoose.model("ProductCache", productCacheSchema);

@@ -13,7 +13,6 @@ const authenticateToken = require('../middleware/authMiddleware');
 const validateRole = require('../middleware/validateRole');
 
 
-
 // Create an order
 router.post('/', authenticateToken, validateRole(['USER']), createOrder);
 
@@ -32,5 +31,7 @@ router.delete('/:id', authenticateToken, validateRole(['USER']), deleteOrder);
 
 // Update order status (Admin only)
 router.patch('/:id', authenticateToken, validateRole(['ADMIN']), updateOrderStatus);
+
+
 
 module.exports = router;

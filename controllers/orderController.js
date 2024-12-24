@@ -1,15 +1,8 @@
 const Order = require("../models/orderModel");
 const { sendMessage } = require("../config/rabbitmq");
 const elasticsearch = require("elasticsearch");
-const { connectProductCacheDB } = require("../config/db");
+const ProductCache = require("../models/productCacheModel");
 
-let ProductCache;
-
-// Initialize ProductCache with a dedicated connection
-(async () => {
-  const productCacheConnection = await connectProductCacheDB();
-  ProductCache = require("../models/productCacheModel")(productCacheConnection);
-})();
 
 // Set up Elasticsearch client
 const esClient = new elasticsearch.Client({

@@ -2,6 +2,7 @@
 const express = require("express");
 const { connectRabbitMQ } = require("./config/rabbitmq");
 const orderRouter = require("./routes/orderRouter");
+const productRouter = require("./routes/productRouter");
 const { connectOrderDB } = require("./config/db");
 const { consumeProductEvents } = require("./events/consumeProductEvents");
 const syncProductCache = require("./services/productCacheSyncService");
@@ -45,3 +46,4 @@ app.use(express.json());
 
 // Routes
 app.use("/orders", orderRouter);
+app.use("/products", productRouter);
