@@ -7,7 +7,7 @@ const productCacheSchema = new mongoose.Schema({
   description: { type: String },
   category_id: { type: String },
   price: { type: Number, required: true },
-  quantity: { type: Number, required: true },
+  quantity: { type: Number},
   image: { type: String }, 
   imageId: { type: mongoose.Schema.Types.ObjectId, ref: 'fs.files' },
   updatedAt: { type: Date, default: Date.now },

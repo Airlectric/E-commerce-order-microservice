@@ -1,4 +1,5 @@
 // orders microservice server.js
+require('dotenv').config();
 const express = require("express");
 const { connectRabbitMQ } = require("./config/rabbitmq");
 const orderRouter = require("./routes/orderRouter");
@@ -6,9 +7,9 @@ const productRouter = require("./routes/productRouter");
 const { connectOrderDB } = require("./config/db");
 const { consumeProductEvents } = require("./events/consumeProductEvents");
 const syncProductCache = require("./services/productCacheSyncService");
-const { initializeAndSync } = require('./elasticsearchSync');
+const { initializeAndSyncProducts } = require('./services/elasticsearchSync');
+const imageRouter = require('./routes/imageRoutes');
 
-require("dotenv").config();
 
 const app = express();
 app.use(express.json());
@@ -28,7 +29,7 @@ app.use(express.json());
     // await consumeProductEvents();
 	
 
-	initializeAndSync().catch((error) => {
+	initializeAndSyncProducts().catch((error) => {
 	  console.error('Failed to initialize and sync:', error);
 	});
 
@@ -47,3 +48,5 @@ app.use(express.json());
 // Routes
 app.use("/orders", orderRouter);
 app.use("/products", productRouter);
+app.use('/images', imageRouter);
+
