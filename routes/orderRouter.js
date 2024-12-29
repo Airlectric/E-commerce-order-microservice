@@ -8,6 +8,7 @@ const {
   updateOrder,
   deleteOrder,
   updateOrderStatus,
+  getAllOrders,
 } = require('../controllers/orderController');
 const authenticateToken = require('../middleware/authMiddleware');
 const validateRole = require('../middleware/validateRole');
@@ -18,6 +19,9 @@ router.post('/', authenticateToken, validateRole(['USER']), createOrder);
 
 // Get all orders for the user
 router.get('/', authenticateToken, validateRole(['USER']), getOrders);
+
+// Get all orders (Admin only)
+router.get('/all', authenticateToken, validateRole(['SHOP_OWNER','ADMIN']), getAllOrders);
 
 // Get an order by ID
 router.get('/:id', authenticateToken, validateRole(['USER']), getOrderById);

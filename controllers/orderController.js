@@ -1,13 +1,17 @@
 const Order = require("../models/orderModel");
 const { sendMessage } = require("../config/rabbitmq");
-const elasticsearch = require("elasticsearch");
+const { Client } = require('@elastic/elasticsearch');
 const ProductCache = require("../models/productCacheModel");
 
 
 // Set up Elasticsearch client
-const esClient = new elasticsearch.Client({
-  host: process.env.ELASTICSEARCH_URL,
+const esClient = new Client({
+  node: process.env.ELASTICSEARCH_URI, 
+  auth: {
+    apiKey: process.env.ELASTICSEARCH_API_KEY 
+  }
 });
+
 
 // Helper function for product validation and total calculation
 const validateProductsAndCalculateTotal = async (products) => {
@@ -106,6 +110,18 @@ exports.createOrder = async (req, res) => {
     res.status(500).json({ message: err.message });
   }
 };
+
+// Get all orders in the database (Admin only)
+exports.getAllOrders = async (req, res) => {
+  try {
+    const orders = await Order.find();
+    res.json(orders);
+  } catch (err) {
+    console.error("Error in getAllOrders:", err.message);
+    res.status(500).json({ message: err.message });
+  }
+};
+
 
 // Get all orders for a user
 exports.getOrders = async (req, res) => {

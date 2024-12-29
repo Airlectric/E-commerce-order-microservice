@@ -1,11 +1,17 @@
 const mongoose = require('mongoose');
 const ProductCache = require('../models/productCacheModel'); // ProductCache model in the orders microservice
+const { bootstrapElasticsearchIndex, esClient } = require('./elasticsearchSync'); 
 require('dotenv').config();
 
 let retryQueue = []; // Temporary queue for failed operations
 
+const INDEX_NAME = process.env.ELASTICSEARCH_PRODUCT_INDEX || 'order_microservice_products';
+
 const syncProductCache = async () => {
   try {
+    // Initialize Elasticsearch
+    await bootstrapElasticsearchIndex(); // Sync existing data
+
     // Connect to the Product microservice database
     const productDB = await mongoose.createConnection(process.env.MONGO_URI_PRODUCT);
     const ProductModel = productDB.model(
@@ -56,8 +62,14 @@ const syncProductCache = async () => {
                 ...populateProductCacheData(populatedProduct),
                 updatedAt: new Date(),
               });
+              // Sync with Elasticsearch
+              await esClient.index({
+                index: INDEX_NAME,
+                id: populatedProduct._id.toString(),
+                body: populateProductCacheData(populatedProduct),
+              });
             });
-            console.log(`Inserted product ${change.fullDocument.title} into ProductCache`);
+            console.log(`Inserted product ${change.fullDocument.title} into ProductCache and Elasticsearch`);
             break;
 
           case 'update':
@@ -68,15 +80,24 @@ const syncProductCache = async () => {
                 { $set: { ...populateProductCacheData(populatedProduct), updatedAt: new Date() } },
                 { upsert: true }
               );
+              // Sync with Elasticsearch
+              await esClient.index({
+                index: INDEX_NAME,
+                id: populatedProduct._id.toString(),
+                body: populateProductCacheData(populatedProduct),
+              });
             });
-            console.log(`Updated product ${change.fullDocument.title} in ProductCache`);
+            console.log(`Updated product ${change.fullDocument.title} in ProductCache and Elasticsearch`);
             break;
 
           case 'delete':
-            await handleCacheSync(() =>
-              ProductCache.deleteOne({ _id: change.documentKey._id })
-            );
-            console.log(`Deleted product with ID ${change.documentKey._id} from ProductCache`);
+            await handleCacheSync(() => ProductCache.deleteOne({ _id: change.documentKey._id }));
+            // Sync with Elasticsearch
+            await esClient.delete({
+              index: INDEX_NAME,
+              id: change.documentKey._id.toString(),
+            });
+            console.log(`Deleted product with ID ${change.documentKey._id} from ProductCache and Elasticsearch`);
             break;
 
           default:
@@ -166,6 +187,11 @@ const retryFailedOperations = async (ProductModel) => {
             ...populateProductCacheData(populatedProductInsert),
             updatedAt: new Date(),
           });
+          await esClient.index({
+            index: INDEX_NAME,
+            id: populatedProductInsert._id.toString(),
+            body: populateProductCacheData(populatedProductInsert),
+          });
           console.log(`Retried insert for product ${populatedProductInsert.title}`);
           break;
 
@@ -176,11 +202,20 @@ const retryFailedOperations = async (ProductModel) => {
             { $set: { ...populateProductCacheData(populatedProductUpdate), updatedAt: new Date() } },
             { upsert: true }
           );
+          await esClient.index({
+            index: INDEX_NAME,
+            id: populatedProductUpdate._id.toString(),
+            body: populateProductCacheData(populatedProductUpdate),
+          });
           console.log(`Retried update for product ${populatedProductUpdate.title}`);
           break;
 
         case 'delete':
           await ProductCache.deleteOne({ _id: change.documentKey._id });
+          await esClient.delete({
+            index: INDEX_NAME,
+            id: change.documentKey._id.toString(),
+          });
           console.log(`Retried delete for product ID ${change.documentKey._id}`);
           break;
 

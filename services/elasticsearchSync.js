@@ -2,11 +2,16 @@ const mongoose = require('mongoose');
 const { Client } = require('@elastic/elasticsearch');
 const ProductCache = require('../models/productCacheModel'); // Updated schema
 
+// Initialize the Elasticsearch client with the remote URL and API key
 const esClient = new Client({
-  node: process.env.ELASTICSEARCH_URI,
+  node: process.env.ELASTICSEARCH_URI, 
+  auth: {
+    apiKey: process.env.ELASTICSEARCH_API_KEY 
+  }
 });
 
 const INDEX_NAME = process.env.ELASTICSEARCH_PRODUCT_INDEX || 'order_microservice_products';
+
 
 // Initialize Elasticsearch index with settings and mappings
 const initializeProductIndex = async () => {
@@ -139,6 +144,8 @@ const startProductChangeStream = async () => {
   });
 };
 
+
+
 // Search products in Elasticsearch
 const searchProducts = async (query) => {
   try {
@@ -217,5 +224,7 @@ const initializeAndSyncProducts = async () => {
 
 module.exports = {
   initializeAndSyncProducts,
+  esClient,
   searchProducts,
+  bootstrapElasticsearchIndex,
 };
